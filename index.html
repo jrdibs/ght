@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grandma's Hot Tub</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+    }
+    #menu {
+      text-align: center;
+      margin-top: 50px;
+    }
+    button {
+      font-size: 20px;
+      margin: 10px;
+    }
+    .char-info {
+      font-size: 16px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <!--
+  <div id="menu">
+    <h1>Choose Your Character</h1>
+    <button onclick="selectCharacter('RYAN')">Ryan</button>
+    <div class="char-info">Speed: 2, Smarts: 3, Charisma: 2</div>
+    <button onclick="selectCharacter('DIESEL')">Diesel</button>
+    <div class="char-info">Speed: 3, Smarts: 2, Charisma: 1</div>
+    <button onclick="selectCharacter('OMAR')">Omar</button>
+    <div class="char-info">Speed: 1, Smarts: 1, Charisma: 3</div>
+  </div>
+  -->
+  <script>
+    let version = "Pre-Alpha"
+
+    //let gameStarted = false;
+    let gameState = "MAIN_MENU"; // MAIN_MENU, CHAR_SELECT, IN_GAME, PAUSED, OPTIONS
+    let previousState = null;
+    let inMaze = false;
+    //let paused = false;
+    let mouseWasPressedLastFrame = false;
+    let player = { x: 0, y: 0, speed: 2, smarts: 1, charisma: 1 };
+    let gameStartTime;
+    let clockMinutes = 0; // in-game minutes since 6PM
+    let hotTubTemp = 80;
+    let bodyTemp = 0;
+    let discomfort = 0;
+    let inventory = { water: 0, towel: 0, klondike: 0, ice_pop: 1 }; // useful for debugging
+    let suspicion = 0;
+    let stamina = 100;
+    let heatOn = true; // useful for debugging
+    let grandmaNextVisit = 30 + Math.floor(Math.random() * 61);
+    let inHotTub = true;
+    let inPool = false;
+    let inHouse = false;
+    let eeTriggered = false;
+    let thermometerState = "Tub";
+    let toggleTPressed = false;
+    let toggleUpPressed = false;
+    let toggleDownPressed = false;
+    let toggleLeftPressed = false;
+    let toggleRightPressed = false;
+    let thermometerTemp = 80;
+    let lastGrandmaAnswer = null;
+    let lastAnswerTime = null;
+
+    let icePopActive = false;
+    let icePopEndMinute = null;
+    let maxStamina = 100;
+
+    let ee_song = new Audio("blunder.mp3");
+    let sound_water = new Audio("Sounds/water.mp3")
+    let sound_towel = new Audio("Sounds/towel.mp3")
+    let sound_klondike = new Audio("Sounds/klondike.mp3")
+    let sound_ice_pop = new Audio("Sounds/ice_pop.mp3")
+    let sound_therm_drop = new Audio("Sounds/therm_drop.mp3")
+    let sound_therm_pickup = new Audio("Sounds/therm_pickup.mp3")
+
+
+    let grandmaWatching = false;
+    let grandmaWatchStart = 0;
+    let grandmaWatchDuration = 0;
+
+    const hotTubArea = { x: 100, y: 300, r: 60 };
+    const poolArea = { x: 600, y: 300, r: 60 };
+    const grandma = { x: 400, y: 100 };
+
+    let grandmaTriangle = null;
+
+    const CHARACTERS = {
+      RYAN: { speed: 2, smarts: 3, charisma: 2 },
+      DIESEL: { speed: 3, smarts: 2, charisma: 1 },
+      OMAR: { speed: 1, smarts: 1, charisma: 3 }
+    };
+
+    const tileSize = 24;
+    let mazeData, playerPos, endPos;
+    let mazeTimerStart, mazeTimeLimit;
+    let lastMazeAttempt = -Infinity;
+
+    let musicTracks = [];
+    let currentTrackIndex = 0;
+    let masterGain, musicGain, sfxGain;
+    let masterVolume = 1.0, musicVolume = 1.0, sfxVolume = 1.0;
+
+
+    function startMaze() {
+        inMaze = true;
+        lastMazeAttempt = millis();
+
+        // Set time limit based on Smarts
+        if (player.smarts === 1) mazeTimeLimit = 10000;
+        else if (player.smarts === 2) mazeTimeLimit = 20000;
+        else mazeTimeLimit = 30000;
+
+        mazeTimerStart = millis();
+
+        const dims = 21;
+        let result = generateMaze(dims, dims);
+        mazeData = result.maze;
+        playerPos = result.start;
+        endPos = result.end;
+    }
+
+
+    function selectCharacter(name) {
+      Object.assign(player, CHARACTERS[name]);
+      player.x = hotTubArea.x;
+      player.y = hotTubArea.y;
+      //document.getElementById('menu').style.display = 'none';
+      gameState = "IN_GAME";
+      gameStartTime = millis();
+    }
+
+    function setup() {
+      createCanvas(800, 600);
+
+      // === Setup master volume chain ===
+      const audioCtx = getAudioContext();
+      masterGain = audioCtx.createGain();
+      musicGain = audioCtx.createGain();
+      sfxGain = audioCtx.createGain();
+
+      musicGain.connect(masterGain);
+      sfxGain.connect(masterGain);
+      masterGain.connect(audioCtx.destination);
+
+      // === Load volume from localStorage ===
+      masterVolume = parseFloat(localStorage.getItem("vol_master") || "1");
+      musicVolume = parseFloat(localStorage.getItem("vol_music") || "1");
+      sfxVolume = parseFloat(localStorage.getItem("vol_sfx") || "1");
+
+      masterGain.gain.value = masterVolume;
+      musicGain.gain.value = musicVolume;
+      sfxGain.gain.value = sfxVolume;
+
+      // === Load music ===
+      let filenames = ["pixel_shadows.mp3", "pixel_shadows_2.mp3"]; // filenames of songs in soundtrack
+      for (let name of filenames) {
+        let track = loadSound("Soundtrack/" + name, (loadedSound) => {
+          loadedSound.disconnect();
+          loadedSound.connect(musicGain);
+        });
+        musicTracks.push(track);
+      }
+
+      // === Start loop once loaded ===
+      setTimeout(startMusicLoop, 1000); // slight delay to ensure loading
+    }
+
+    function drawClock() {
+      fill(0);
+      textSize(20);
+      let hours = 6 + Math.floor(clockMinutes / 60);
+      let minutes = clockMinutes % 60;
+      let ampm = hours >= 12 ? 'AM' : 'PM';
+      if (hours > 12) hours -= 12;
+      let timeStr = nf(hours, 2) + ':' + nf(minutes, 2) + ' ' + ampm;
+      text("" + timeStr, 20, 30);
+    }
+
+    function currentAirTemp() {
+      let minutesSince6PM = constrain(clockMinutes, 0, 360);
+      return 80 - (20 * (minutesSince6PM / 360));
+    }
+
+    function updateThermometerTemp() {
+      let target = 0
+      if(thermometerState === "Tub") {
+        target = hotTubTemp;
+      } else if(thermometerState === "Pool") {
+        target = 80
+      } else if(thermometerState === "Air") {
+        target = currentAirTemp();
+      }
+      let delta = target - thermometerTemp;
+      thermometerTemp += delta * 0.0025;
+    }
+
+    function drawTemps() {
+      fill(0);
+      text("Hot Tub Temperature: " + Math.round(hotTubTemp) + "°", width - 250, 30);
+      text("Thermometer: " + Math.round(thermometerTemp) + "° (" + (thermometerState) + ")", width - 250, 60);
+      text("HEAT: ", width - 250, 90);
+      fill(heatOn ? 'green' : 'red');
+      ellipse(width - 180, 84, 16);
+
+      fill(150);
+      rect(20, 50, 20, 100);
+      fill(0, 0, 255);
+      let tempBarHeight = map(bodyTemp, 0, 100, 0, 100);
+      rect(20, 150 - tempBarHeight, 20, tempBarHeight);
+      fill(0);
+
+      fill(150);
+      rect(60, 50, 20, 100);
+      fill(255, 255, 0);
+      let disBarHeight = map(discomfort, 0, 100, 0, 100);
+      rect(60, 150 - disBarHeight, 20, disBarHeight);
+      fill(0);
+    }
+
+    function drawEnvironment() {
+      fill(255, 100, 100);
+      ellipse(hotTubArea.x, hotTubArea.y, hotTubArea.r * 2);
+      textAlign(CENTER);
+      text("Hot Tub", hotTubArea.x, hotTubArea.y + hotTubArea.r + 20);
+
+      fill(100, 100, 255);
+      ellipse(poolArea.x, poolArea.y, poolArea.r * 2);
+      text("Pool", poolArea.x, poolArea.y + poolArea.r + 20);
+
+      fill(200);
+      ellipse(grandma.x, grandma.y, 50);
+      text("Grandma", grandma.x, grandma.y + 40);
+
+      fill(0);
+      ellipse(player.x, player.y, 30);
+
+      if (grandmaTriangle) {
+        fill(150, 0, 150);
+        triangle(grandmaTriangle.x, grandmaTriangle.y, grandmaTriangle.x - 10, grandmaTriangle.y + 20, grandmaTriangle.x + 10, grandmaTriangle.y + 20);
+      }
+    }
+
+    function keyPressed() {
+      console.log("Key pressed:", key, keyCode, "Game state:", gameState); // for debugging
+      if (key === '1' && inventory.water > 0) {
+        bodyTemp = 0;
+        inventory.water--;
+        sound_water.play();
+      } else if (key === '2' && inventory.towel > 0) {
+        discomfort = 0;
+        inventory.towel--;
+        sound_towel.play();
+      } else if (key === '3' && inventory.klondike > 0) {
+        suspicion = 0;
+        inventory.klondike--;
+        sound_klondike.play();
+      } else if (key === '4' && inventory.ice_pop > 0) {
+        maxStamina = 200;
+        // stamina = 200;
+        inventory.ice_pop--;
+        sound_ice_pop.play();
+        icePopActive = true;
+        icePopEndMinute = clockMinutes + 60;
+      } else if (keyCode === 27) { // ESC
+        if(gameState === "IN_GAME") {
+          gameState = "PAUSED";
+        } else if(gameState === "PAUSED") {
+          gameState = "IN_GAME";
+        }
+      } else if (key.toLowerCase() === 'f' && inHouse && !eeTriggered) {
+        eeTriggered = true;
+        ee_song.play();
+      }
+    }
+
+    function drawInventory() {
+      fill(0);
+      textSize(14);
+      textAlign(LEFT);
+      let y = height - 80;
+      text(`Water Bottle (${inventory.water})`, width - 200, y);
+      text(`Towel (${inventory.towel})`, width - 200, y + 20);
+      text(`Klondike (${inventory.klondike})`, width - 200, y + 40);
+      text(`Ice Pop (${inventory.ice_pop})`, width - 200, y + 60);
+    }
+
+    function drawStaminaBar() {
+      fill(150);
+      rect(20, height - 30, 100, 10);
+      fill(0, 255, 0);
+      rect(20, height - 30, (stamina / maxStamina) * 100, 10);
+      if(icePopActive) {
+        text(`1/2`, 10, height - 30)
+      }
+    }
+
+    function drawSuspicionBar() {
+      fill(150);
+      rect(100, 50, 20, 100);
+      fill(255, 0, 255);
+      let susBar = map(suspicion, 0, 100, 0, 100);
+      rect(100, 150 - susBar, 20, susBar);
+    }
+
+    function updateSuspicion() {
+      let rate = player.charisma === 3 ? 0.02 : player.charisma === 2 ? 0.04 : 0.06;
+      if (inHotTub) {
+        if(grandmaWatching) {
+          suspicion = max(0, suspicion - rate * 0.25);
+        } else {
+          suspicion = max(0, suspicion - rate * 0.10);
+        }
+      } else if (inPool) {
+        if(grandmaWatching) {
+          suspicion = min(100, suspicion + rate * 0.50);
+        } else {
+          suspicion = min(100, suspicion + rate * 0.20);
+        }
+      } else {
+        if(grandmaWatching) {
+          suspicion = min(100, suspicion + rate * 1.25);
+        } else {
+          suspicion = min(100, suspicion + rate * 0.50);
+        }
+      }
+      if(thermometerState === "Air") {
+        if(grandmaWatching) {
+          suspicion = min(100, suspicion + rate * 0.25)
+        } else {
+          suspicion = min(100, suspicion + rate * 0.10)
+        }
+      }
+
+      if (suspicion >= 100) {
+        heatOff("Heat turned off due to suspicion!");
+      }
+    }
+
+    function grandmaInteraction() {
+      grandmaWatching = false;
+      if (Math.random() < 2 / 3) {
+        grandmaWatching = true;
+        grandmaWatchStart = millis();
+        grandmaWatchDuration = random(10000, 20000);
+        grandmaTriangle = { x: grandma.x, y: grandma.y, stage: "watching", startTime: millis() };
+      } else {
+        grandmaTriangle = { x: grandma.x, y: grandma.y, stage: "toTub", startTime: millis() };
+      }
+    }
+
+    function grandmaOfferItems() {
+      let roll = Math.random();
+      let threshold = [0.25, 0.5, 0.75][player.charisma - 1];
+      if (roll > threshold) return;
+
+      const items = ['water', 'towel', 'klondike', 'ice_pop'];
+      let items_display = { water: 'Water Bottle', towel: 'Towel', klondike: 'Klondike', ice_pop: 'Ice Pop' };
+      let offered = shuffle(items).slice(0, 2);
+      let choice = prompt(`Grandma offers you one item:\n1. ${items_display[offered[0]]}\n2. ${items_display[offered[1]]}\nEnter 1 or 2`);
+      if (choice === '1') inventory[offered[0]]++;
+      else if (choice === '2') inventory[offered[1]]++;
+    }
+
+    function draw() {
+      background(200);
+
+      /*
+      if (gameState === "CHAR_SELECT") {
+        document.getElementById("menu").style.display = "block";
+      } else {
+        document.getElementById("menu").style.display = "none";
+      }
+      */
+
+
+      switch(gameState) {
+        case "MAIN_MENU":
+          drawMainMenu();
+          break;
+        case "CHAR_SELECT":
+          drawCharacterSelect();
+          break;
+        case "PAUSED":
+          drawPauseMenu();
+          break;
+        case "OPTIONS":
+          drawOptionsMenu();
+          break;
+        case "IN_GAME":
+          break;
+      }
+
+      /*if (!gameStarted) return;
+
+      if (paused) {
+        fill(0, 200);
+        rect(0, 0, width, height);
+        fill(255);
+        textAlign(CENTER, CENTER);
+        textSize(32);
+        text("Paused", width / 2, height / 2);
+        return;
+      }*/
+
+      if (inMaze) {
+        drawMaze();
+        return; // pause the main game
+      }
+
+      if(gameState === "IN_GAME") {
+        // Movement
+        let moveSpeed = player.speed;
+        if (keyIsDown(SHIFT) && isMoving()) {
+          if (stamina > 0) {
+            moveSpeed *= 1.5;
+            stamina -= 0.5 * (4 - player.speed);
+          }
+        } else {
+          stamina += 0.1 * player.speed;
+        }
+        stamina = constrain(stamina, 0, maxStamina);
+
+        if (keyIsDown(65)) player.x -= moveSpeed;
+        if (keyIsDown(68)) player.x += moveSpeed;
+        if (keyIsDown(87)) player.y -= moveSpeed;
+        if (keyIsDown(83)) player.y += moveSpeed;
+
+        if (keyIsDown(84)) {
+          if(inHotTub) {
+            if(thermometerState === "Tub") {
+              if (!toggleTPressed) {
+                thermometerState = "Air";
+                sound_therm_pickup.play();
+                toggleTPressed = true;
+              }
+            }
+            else if(thermometerState === "Air") {
+              if (!toggleTPressed) {
+                thermometerState = "Tub";
+                sound_therm_drop.play();
+                toggleTPressed = true;
+              }
+            }
+          } else if(inPool) {
+            if(thermometerState === "Pool") {
+              if (!toggleTPressed) {
+                thermometerState = "Air";
+                sound_therm_pickup.play();
+                toggleTPressed = true;
+              }
+            }
+            else if(thermometerState === "Air") {
+              if (!toggleTPressed) {
+                thermometerState = "Pool";
+                sound_therm_drop.play();
+                toggleTPressed = true;
+              }
+            }
+          }
+        } else {
+          toggleTPressed = false;
+        }
+
+        if (!heatOn && keyIsDown(72) && !inMaze && millis() > lastMazeAttempt + 30000) {
+          startMaze();
+        }
+
+        clockMinutes = Math.floor((millis() - gameStartTime) / 1000);
+        if (clockMinutes >= 360) return gameOver("Time's up! You lose.");
+
+        if (heatOn) {
+          let delta = 1 / Math.log(hotTubTemp - 79 + 2);
+          hotTubTemp = min(110, hotTubTemp + delta * 0.005);
+        } else {
+          hotTubTemp = max(80, hotTubTemp - 0.002);
+        }
+
+        updateThermometerTemp();
+
+        inHotTub = dist(player.x, player.y, hotTubArea.x, hotTubArea.y) < hotTubArea.r;
+        inPool = dist(player.x, player.y, poolArea.x, poolArea.y) < poolArea.r;
+        inHouse = dist(player.x, player.y, grandma.x, grandma.y) < 25;
+
+        if (inHotTub) {
+          bodyTemp += 0.07 * (hotTubTemp / 100.0);
+          discomfort = max(0, discomfort - 0.02);
+        } else if (inPool) {
+          bodyTemp = max(0, bodyTemp - 0.05);
+          discomfort = max(0, discomfort - 0.02);
+        } else {
+          bodyTemp = max(0, bodyTemp - 0.01);
+          discomfort += 0.1;
+        }
+
+        if (bodyTemp >= 100) return gameOver(`You passed out from heat! You lose.`);
+        if (discomfort >= 100) return gameOver(`You have collapsed from shivering! You lose.`);
+        if (hotTubTemp >= 110) return gameOver(`Hot tub reached 110° at ${timeStr}! You win!`);
+
+        if (grandmaTriangle) {
+          let t = (millis() - grandmaTriangle.startTime) / 2000;
+          if (grandmaTriangle.stage === "toTub") {
+            grandmaTriangle.x = lerp(grandma.x, hotTubArea.x, t);
+            grandmaTriangle.y = lerp(grandma.y, hotTubArea.y, t);
+            if (t >= 1) {
+              grandmaVisit();
+              grandmaTriangle.stage = "toHouse";
+              grandmaTriangle.startTime = millis();
+            }
+          } else if (grandmaTriangle.stage === "toHouse") {
+            let t = (millis() - grandmaTriangle.startTime) / 2000;
+            grandmaTriangle.x = lerp(hotTubArea.x, grandma.x, t);
+            grandmaTriangle.y = lerp(hotTubArea.y, grandma.y, t);
+            if (t >= 1) grandmaTriangle = null;
+          } else if (grandmaTriangle.stage === "watching") {
+            grandmaTriangle.x = grandma.x;
+            grandmaTriangle.y = grandma.y;
+          }
+        }
+
+        if (grandmaWatching && millis() - grandmaWatchStart > grandmaWatchDuration) {
+          grandmaWatching = false;
+          grandmaTriangle = null;
+          grandmaNextVisit += (30 - suspicion * 0.2) + Math.floor(Math.random() * (61 - suspicion * 0.3));
+        }
+
+        if (clockMinutes >= grandmaNextVisit && !grandmaTriangle && !grandmaWatching && heatOn) {
+          grandmaInteraction();
+        }
+
+        if (icePopActive && clockMinutes >= icePopEndMinute) {
+          maxStamina = 100;
+          if (stamina > 100) stamina = 100;
+          icePopActive = false;
+        }
+
+
+        drawClock();
+        drawTemps();
+        drawEnvironment();
+
+        updateSuspicion();
+        drawSuspicionBar();
+        drawInventory();
+        drawStaminaBar();
+      }
+
+      mouseWasPressedLastFrame = mouseIsPressed;
+      
+    }
+
+    function drawMainMenu() {
+      background(100, 150, 200);
+      fill(255);
+      textAlign(CENTER, CENTER);
+      textSize(48);
+      text("Grandma's Hot Tub", width / 2, height / 3);
+
+      textSize(24);
+      drawButton("Play", width / 2 - 75, height / 2, 150, 50, () => {
+        gameState = "CHAR_SELECT";
+      });
+
+      drawButton("Options", width / 2 - 75, height / 2 + 70, 150, 50, () => {
+        previousState = gameState;
+        gameState = "OPTIONS";
+      });
+
+      textSize(14);
+      fill(240);
+      textAlign(RIGHT, BOTTOM);
+      text(version, width - 20, height - 10);
+    }
+
+    function drawPauseMenu() {
+      background(0, 0, 0, 150);
+      fill(255);
+      textAlign(CENTER, CENTER);
+      textSize(48);
+      text("Paused", width / 2, height / 3);
+
+      textSize(24);
+      drawButton("Options", width / 2 - 75, height / 2, 150, 50, () => {
+        previousState = "PAUSED";
+        gameState = "OPTIONS";
+      });
+
+      drawButton("Main Menu", width / 2 - 75, height / 2 + 70, 150, 50, () => {
+        resetGame(); // clears everything
+        gameState = "MAIN_MENU";
+      });
+    }
+
+    function drawOptionsMenu() {
+      background(80);
+      textAlign(CENTER, TOP);
+      textSize(36);
+      fill(255);
+      text("Options", width / 2, 40);
+
+      const audioTabX = width / 2 - 120;
+      const controlsTabX = width / 2 + 20;
+      const tabY = 100;
+      const tabW = 100;
+      const tabH = 40;
+
+      // Draw Tabs
+      textSize(24);
+      drawOptionsMenu.activeTab = drawOptionsMenu.activeTab || "Audio";
+
+      drawButton("Audio", audioTabX, tabY, tabW, tabH, () => {
+        drawOptionsMenu.activeTab = "Audio";
+      });
+      drawButton("Controls", controlsTabX, tabY, tabW, tabH, () => {
+        drawOptionsMenu.activeTab = "Controls";
+      });
+
+      // Highlight selected tab
+      fill(255, 255, 0, 80);
+      if (drawOptionsMenu.activeTab === "Audio") {
+        rect(audioTabX, tabY, tabW, tabH, 10);
+      } else {
+        rect(controlsTabX, tabY, tabW, tabH, 10);
+      }
+
+      // --- AUDIO TAB CONTENT (sliders to be added later) ---
+      if (drawOptionsMenu.activeTab === "Audio") {
+        textSize(18);
+        textAlign(LEFT, CENTER);
+        fill(255);
+        text("Master", width / 2 - 100, 180);
+        text("Music", width / 2 - 100, 230);
+        text("Sounds", width / 2 - 100, 280);
+        // We'll add actual sliders later
+      }
+
+      // --- CONTROLS TAB CONTENT (empty for now) ---
+      if (drawOptionsMenu.activeTab === "Controls") {
+        textSize(18);
+        textAlign(CENTER, CENTER);
+        fill(200);
+        text("Controls coming soon...", width / 2, 200);
+        // We'll add keybind customization later
+      }
+
+      // Back button
+      drawButton("Back", 20, height - 60, 100, 40, () => {
+        gameState = previousState || "MAIN_MENU";
+      });
+    }
+
+    function drawCharacterSelect() {
+      background(150, 200, 250);
+
+      textAlign(CENTER, CENTER);
+      textSize(36);
+      fill(0);
+      text("Choose Your Character", width / 2, 60);
+
+      const btnY = height / 2 - 40;
+      const btnW = 120;
+      const btnH = 50;
+      const spacing = 40;
+      const names = ["RYAN", "DIESEL", "OMAR"];
+
+      const totalWidth = names.length * btnW + (names.length - 1) * spacing;
+      let startX = width / 2 - totalWidth / 2;
+
+      for (let i = 0; i < names.length; i++) {
+        let name = names[i];
+        let x = startX + i * (btnW + spacing);
+
+        // Hover detection
+        const hovering = (
+          mouseX > x && mouseX < x + btnW &&
+          mouseY > btnY && mouseY < btnY + btnH
+        );
+
+        push();
+        textSize(hovering ? 32 : 24);
+        drawButton(name, x, btnY, btnW, btnH, () => {
+          selectCharacter(name);
+          gameState = "IN_GAME";
+          gameStartTime = millis();
+        });
+        pop();
+        
+
+        if (hovering) {
+          push();
+          const char = CHARACTERS[name];
+          textSize(18);
+          fill(0);
+          text(`Speed: ${char.speed}  Smarts: ${char.smarts}  Charisma: ${char.charisma}`, width / 2, btnY + 80);
+          pop();
+        }
+      }
+    }
+
+
+    function drawButton(label, x, y, w, h, onClick) {
+      fill(50);
+      rect(x, y, w, h, 10);
+      fill(255);
+      textAlign(CENTER, CENTER);
+      text(label, x + w / 2, y + h / 2);
+
+      const hovering = mouseX > x && mouseX < x + w && mouseY > y && mouseY < y + h;
+
+      console.log(hovering, mouseIsPressed, mouseWasPressedLastFrame);
+
+      if (hovering && mouseIsPressed && !mouseWasPressedLastFrame) {
+        console.log('click');
+        onClick();
+      }
+    }
+
+
+
+
+
+    function grandmaVisit() {
+      if (!heatOn) return;
+
+      if (!inHotTub) {
+        let turnOffChance = [1.0, 0.5, 0.25][player.charisma - 1];
+        if (Math.random() < turnOffChance) {
+          heatOff("Grandma turned off the heat because you weren't in the tub.");
+          grandmaNextVisit += (30 - suspicion * 0.2) + Math.floor(Math.random() * (61 - suspicion * 0.3));
+          grandmaOfferItems();
+          return;
+        }
+      }
+
+      let askChance = [0.75, 0.6, 0.45][player.charisma - 1];
+      if (Math.random() < askChance) grandmaTempCheck();
+      grandmaNextVisit += (30 - suspicion * 0.2) + Math.floor(Math.random() * (61 - suspicion * 0.3));
+      grandmaOfferItems();
+    }
+
+    function grandmaTempCheck() {
+      let threshold = Math.floor(hotTubTemp - 5 + Math.random() * 11);
+      let estimate = "???";
+      if (player.smarts == 2) estimate = Math.round(threshold + (Math.random() * 4 - 2));
+      if (player.smarts == 3) estimate = Math.round(threshold + (Math.random() * 2 - 1));
+
+      let guess = prompt(`Grandma asks: What is the hot tub temperature?\n(What you think Grandma thinks: ${estimate})`);
+      guess = Math.round(Number(guess));
+      
+      if (heatOn) {
+        let now = clockMinutes;
+        if (lastGrandmaAnswer !== null && lastAnswerTime !== null) {
+          let requiredDelta = 4 * (now - lastAnswerTime);
+          if (guess < lastGrandmaAnswer + requiredDelta) {
+            heatOff("Grandma: That doesn't make sense. Turning off the heat.");
+            return;
+          }
+        }
+        lastGrandmaAnswer = guess;
+        lastAnswerTime = now;
+      }
+
+      // Soft barrier logic
+      let charisma = player.charisma;
+      const shutoffChances = {
+        1: { 97: 0.2, 98: 0.4, 99: 0.6, 100: 0.8, 101: 1 },
+        2: { 99: 0.2, 100: 0.4, 101: 0.6, 102: 0.8, 103: 1 },
+        3: { 101: 0.2, 102: 0.4, 103: 0.6, 104: 0.8, 105: 1 }
+      };
+
+      const thresholds = shutoffChances[charisma];
+      let maxKey = Math.max(...Object.keys(thresholds).map(Number));
+      let risk = guess >= maxKey ? 1 : (thresholds[guess] || 0);
+      if (Math.random() < risk) {
+        heatOff("Grandma: That's too hot! Turning off the heat.");
+        return;
+      }
+
+      if (guess >= threshold) return alert("Grandma: Okay, sounds good.");
+
+      let X = [2, 3, 4][player.charisma - 1];
+      let Y = [3, 4, 5][player.charisma - 1];
+
+      if (Math.abs(thermometerTemp - guess) <= X && Math.abs(thermometerTemp - threshold) <= Y)
+        alert("Grandma checks thermometer and says: Okay.");
+      else
+        heatOff("Grandma doesn't believe you. Turning off the heat.");
+    }
+
+    function heatOff(msg) {
+      heatOn = false;
+      lastMazeAttempt = millis();
+      alert(msg);
+    }
+
+    function gameOver(message) {
+      noLoop();
+      alert(message);
+      location.reload();
+    }
+
+    function drawMaze() {
+        background(30);
+
+        for (let y = 0; y < mazeData.length; y++) {
+            for (let x = 0; x < mazeData[y].length; x++) {
+                fill(mazeData[y][x] === 1 ? 0 : 255);
+                rect(x * tileSize, y * tileSize, tileSize, tileSize);
+            }
+        }
+
+        // Draw player
+        fill('green');
+        rect(playerPos[1] * tileSize, playerPos[0] * tileSize, tileSize, tileSize);
+
+        // Draw end
+        fill('red');
+        rect(endPos[1] * tileSize, endPos[0] * tileSize, tileSize, tileSize);
+        
+
+
+
+
+
+        // Timer bar
+        let elapsed = (millis() - mazeTimerStart);
+        let remaining = max(0, mazeTimeLimit - elapsed);
+        fill('blue');
+        rect(0, height - 10, (remaining / mazeTimeLimit) * width, 10);
+
+
+        // Movement
+        let [y, x] = playerPos;
+        if (keyIsDown(87) && mazeData[y - 1][x] === 0) {
+            if (!toggleUpPressed) {
+                playerPos[0]--;
+                toggleUpPressed = true;
+            }
+        } else {
+            toggleUpPressed = false;
+        }
+        if (keyIsDown(83) && mazeData[y + 1][x] === 0) {
+            if (!toggleDownPressed) {
+                playerPos[0]++;
+                toggleDownPressed = true;
+            }
+        } else {
+            toggleDownPressed = false;
+        }
+        if (keyIsDown(65) && mazeData[y][x - 1] === 0) {
+            if (!toggleLeftPressed) {
+                playerPos[1]--;
+                toggleLeftPressed = true;
+            }
+        } else {
+            toggleLeftPressed = false;
+        }
+        if (keyIsDown(68) && mazeData[y][x + 1] === 0) {
+            if (!toggleRightPressed) {
+                playerPos[1]++;
+                toggleRightPressed = true;
+            }
+        } else {
+            toggleRightPressed = false;
+        }
+
+
+        // Check win
+        if (playerPos[0] === endPos[0] && playerPos[1] === endPos[1]) {
+            heatOn = true;
+            inMaze = false;
+        }
+
+        // Check timeout
+        if (remaining <= 0) {
+            inMaze = false;
+        }
+    }
+
+    /*
+    function generateMaze(width, height) {
+        // Ensure width and height are odd to maintain passage/wall structure
+        width = width % 2 === 0 ? width + 1 : width;
+        height = height % 2 === 0 ? height + 1 : height;
+
+        // Initialize maze with walls (1)
+        let maze = Array.from({ length: height }, () => Array(width).fill(1));
+
+        // Helper function to check if coordinates are within bounds
+        function inBounds(y, x) {
+            return y >= 0 && y < height && x >= 0 && x < width;
+        }
+
+        // Directions for adjacent cells (up, down, left, right)
+        const directions = [
+            [-2, 0], // up
+            [2, 0],  // down
+            [0, -2], // left
+            [0, 2]   // right
+        ];
+
+        // Frontier list to store cells to be considered
+        let frontier = [];
+
+        // Add a cell to the frontier if it's a wall and within bounds
+        function addFrontier(y, x) {
+            if (inBounds(y, x) && maze[y][x] === 1) {
+                frontier.push([y, x]);
+            }
+        }
+
+        // Get neighboring passage cells (already part of the maze)
+        function getNeighbors(y, x) {
+            let neighbors = [];
+            for (let [dy, dx] of directions) {
+                let ny = y + dy, nx = x + dx;
+                if (inBounds(ny, nx) && maze[ny][nx] === 0) {
+                    neighbors.push([ny, nx]);
+                }
+            }
+            return neighbors;
+        }
+
+        // Start position on left edge (odd y-coordinate)
+        let startY = Math.floor(random(1, height / 2)) * 2 + 1;
+        let startX = 1;
+        maze[startY][startX] = 0; // Set starting cell as passage
+        maze[startY][0] = 0;      // Open entrance
+
+        // Add neighboring cells to frontier
+        for (let [dy, dx] of directions) {
+            addFrontier(startY + dy, startX + dx);
+        }
+
+        // Prim's algorithm loop
+        while (frontier.length > 0) {
+            // Pick a random frontier cell
+            let randIndex = Math.floor(Math.random() * frontier.length);
+            let [y, x] = frontier[randIndex];
+
+            // Remove the cell from frontier
+            frontier.splice(randIndex, 1);
+
+            // Get neighboring passage cells
+            let neighbors = getNeighbors(y, x);
+            if (neighbors.length > 0) {
+                // Randomly select a neighbor to connect to
+                let [ny, nx] = neighbors[Math.floor(Math.random() * neighbors.length)];
+
+                // Connect the frontier cell to the neighbor by carving a passage
+                let wy = y + (ny - y) / 2;
+                let wx = x + (nx - x) / 2;
+                maze[y][x] = 0;     // Set frontier cell as passage
+                maze[wy][wx] = 0;   // Set wall between as passage
+
+                // Add new neighboring cells to frontier
+                for (let [dy, dx] of directions) {
+                    addFrontier(y + dy, x + dx);
+                }
+            }
+        }
+
+        // End position on right edge (odd y-coordinate)
+        let endY = Math.floor(random(1, height / 2)) * 2 + 1;
+        maze[endY][width - 1] = 0;
+
+        // Ensure path to exit by connecting the last passage cell to the exit
+        for (let x = width - 2; x >= 0; x--) {
+            if (maze[endY][x] === 0) {
+                maze[endY][x + 1] = 0;
+                break;
+            }
+        }
+
+        return { maze, start: [startY, 0], end: [endY, width - 1] };
+    }
+    */
+    
+    function generateMaze(width, height) {
+        let maze = Array.from({ length: height }, () => Array(width).fill(1));
+
+        const directions = [
+            [-2, 0],
+            [2, 0],
+            [0, -2],
+            [0, 2]
+        ];
+
+        function inBounds(y, x) {
+            return x >= 0 && x < width && y >= 0 && y < height;
+        }
+
+        function carve(y, x) {
+            maze[y][x] = 0;
+            shuffleArray(directions);
+            for (let [dy, dx] of directions) {
+            let ny = y + dy, nx = x + dx;
+            let wy = y + dy / 2, wx = x + dx / 2;
+            if (inBounds(ny, nx) && maze[ny][nx] === 1) {
+                maze[wy][wx] = 0;
+                carve(ny, nx);
+            }
+            }
+        }
+
+        // Start position on left edge
+        let startY = Math.floor(random(1, height / 2)) * 2 + 1;
+        carve(startY, 1);
+        maze[startY][0] = 0;
+
+        // End position on right edge
+        let endY = Math.floor(random(1, height / 2)) * 2 + 1;
+        maze[endY][width - 1] = 0;
+
+        return { maze, start: [startY, 0], end: [endY, width - 1] };
+    }
+    
+
+    function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            let j = Math.floor(random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+    }
+
+    function resetGame() {
+      // Reset everything that matters when starting over
+      player = { x: 0, y: 0, speed: 2, smarts: 1, charisma: 1 };
+      stamina = 100;
+      suspicion = 0;
+      heatOn = true;
+      bodyTemp = 0;
+      discomfort = 0;
+      inventory = { water: 0, towel: 0, klondike: 0, ice_pop: 0 };
+      grandmaTriangle = null;
+      grandmaWatching = false;
+      inHotTub = true;
+      inPool = false;
+      inHouse = false;
+      thermometerState = "Tub";
+      eeTriggered = false;
+      clockMinutes = 0;
+      gameStartTime = millis();
+    }
+
+    function isMoving() {
+      return keyIsDown(65) || keyIsDown(68) || keyIsDown(87) || keyIsDown(83);
+    }
+
+    function startMusicLoop() {
+      if (musicTracks.length === 0) return;
+
+      shuffleArray(musicTracks);
+      currentTrackIndex = 0;
+      playNextTrack();
+    }
+
+    function playNextTrack() {
+      let track = musicTracks[currentTrackIndex];
+      if (!track) return;
+
+      track.play();
+      track.onended(() => {
+        currentTrackIndex = (currentTrackIndex + 1) % musicTracks.length;
+        playNextTrack();
+      });
+    }
+
+
+  </script>
+</body>
+</html>
