@@ -168,7 +168,7 @@
       // === Load music ===
       let filenames = ["pixel_shadows.mp3", "pixel_shadows_2.mp3"]; // filenames of songs in soundtrack
       for (let name of filenames) {
-        let track = loadSound("Soundtrack/" + name, (loadedSound) => {
+        let track = loadSound(name, (loadedSound) => {
           loadedSound.disconnect();
           loadedSound.connect(musicGain);
         });
