@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Grandma's Hot Tub</title>
+  <!--<link rel="icon" href="path/to/hot-tub.ico" /> -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
   <style>
@@ -30,25 +31,11 @@
   </style>
 </head>
 <body>
-  <!--
-  <div id="menu">
-    <h1>Choose Your Character</h1>
-    <button onclick="selectCharacter('RYAN')">Ryan</button>
-    <div class="char-info">Speed: 2, Smarts: 3, Charisma: 2</div>
-    <button onclick="selectCharacter('DIESEL')">Diesel</button>
-    <div class="char-info">Speed: 3, Smarts: 2, Charisma: 1</div>
-    <button onclick="selectCharacter('OMAR')">Omar</button>
-    <div class="char-info">Speed: 1, Smarts: 1, Charisma: 3</div>
-  </div>
-  -->
   <script>
     let version = "Pre-Alpha"
-
-    //let gameStarted = false;
     let gameState = "MAIN_MENU"; // MAIN_MENU, CHAR_SELECT, IN_GAME, PAUSED, OPTIONS
     let previousState = null;
     let inMaze = false;
-    //let paused = false;
     let mouseWasPressedLastFrame = false;
     let player = { x: 0, y: 0, speed: 2, smarts: 1, charisma: 1 };
     let gameStartTime;
@@ -138,7 +125,6 @@
       Object.assign(player, CHARACTERS[name]);
       player.x = hotTubArea.x;
       player.y = hotTubArea.y;
-      //document.getElementById('menu').style.display = 'none';
       gameState = "IN_GAME";
       gameStartTime = millis();
     }
@@ -255,7 +241,7 @@
     }
 
     function keyPressed() {
-      //console.log("Key pressed:", key, keyCode, "Game state:", gameState); // for debugging
+      console.log("Key pressed:", key, keyCode, "Game state:", gameState); // for debugging
       if (key === '1' && inventory.water > 0) {
         bodyTemp = 0;
         inventory.water--;
@@ -378,15 +364,6 @@
     function draw() {
       background(200);
 
-      /*
-      if (gameState === "CHAR_SELECT") {
-        document.getElementById("menu").style.display = "block";
-      } else {
-        document.getElementById("menu").style.display = "none";
-      }
-      */
-
-
       switch(gameState) {
         case "MAIN_MENU":
           drawMainMenu();
@@ -403,18 +380,6 @@
         case "IN_GAME":
           break;
       }
-
-      /*if (!gameStarted) return;
-
-      if (paused) {
-        fill(0, 200);
-        rect(0, 0, width, height);
-        fill(255);
-        textAlign(CENTER, CENTER);
-        textSize(32);
-        text("Paused", width / 2, height / 2);
-        return;
-      }*/
 
       if (inMaze) {
         drawMaze();
@@ -720,7 +685,7 @@
 
       const hovering = mouseX > x && mouseX < x + w && mouseY > y && mouseY < y + h;
 
-      //console.log(hovering, mouseIsPressed, mouseWasPressedLastFrame);
+      console.log(hovering, mouseIsPressed, mouseWasPressedLastFrame);
 
       if (hovering && mouseIsPressed && !mouseWasPressedLastFrame) {
         console.log('click');
@@ -889,105 +854,6 @@
             inMaze = false;
         }
     }
-
-    /*
-    function generateMaze(width, height) {
-        // Ensure width and height are odd to maintain passage/wall structure
-        width = width % 2 === 0 ? width + 1 : width;
-        height = height % 2 === 0 ? height + 1 : height;
-
-        // Initialize maze with walls (1)
-        let maze = Array.from({ length: height }, () => Array(width).fill(1));
-
-        // Helper function to check if coordinates are within bounds
-        function inBounds(y, x) {
-            return y >= 0 && y < height && x >= 0 && x < width;
-        }
-
-        // Directions for adjacent cells (up, down, left, right)
-        const directions = [
-            [-2, 0], // up
-            [2, 0],  // down
-            [0, -2], // left
-            [0, 2]   // right
-        ];
-
-        // Frontier list to store cells to be considered
-        let frontier = [];
-
-        // Add a cell to the frontier if it's a wall and within bounds
-        function addFrontier(y, x) {
-            if (inBounds(y, x) && maze[y][x] === 1) {
-                frontier.push([y, x]);
-            }
-        }
-
-        // Get neighboring passage cells (already part of the maze)
-        function getNeighbors(y, x) {
-            let neighbors = [];
-            for (let [dy, dx] of directions) {
-                let ny = y + dy, nx = x + dx;
-                if (inBounds(ny, nx) && maze[ny][nx] === 0) {
-                    neighbors.push([ny, nx]);
-                }
-            }
-            return neighbors;
-        }
-
-        // Start position on left edge (odd y-coordinate)
-        let startY = Math.floor(random(1, height / 2)) * 2 + 1;
-        let startX = 1;
-        maze[startY][startX] = 0; // Set starting cell as passage
-        maze[startY][0] = 0;      // Open entrance
-
-        // Add neighboring cells to frontier
-        for (let [dy, dx] of directions) {
-            addFrontier(startY + dy, startX + dx);
-        }
-
-        // Prim's algorithm loop
-        while (frontier.length > 0) {
-            // Pick a random frontier cell
-            let randIndex = Math.floor(Math.random() * frontier.length);
-            let [y, x] = frontier[randIndex];
-
-            // Remove the cell from frontier
-            frontier.splice(randIndex, 1);
-
-            // Get neighboring passage cells
-            let neighbors = getNeighbors(y, x);
-            if (neighbors.length > 0) {
-                // Randomly select a neighbor to connect to
-                let [ny, nx] = neighbors[Math.floor(Math.random() * neighbors.length)];
-
-                // Connect the frontier cell to the neighbor by carving a passage
-                let wy = y + (ny - y) / 2;
-                let wx = x + (nx - x) / 2;
-                maze[y][x] = 0;     // Set frontier cell as passage
-                maze[wy][wx] = 0;   // Set wall between as passage
-
-                // Add new neighboring cells to frontier
-                for (let [dy, dx] of directions) {
-                    addFrontier(y + dy, x + dx);
-                }
-            }
-        }
-
-        // End position on right edge (odd y-coordinate)
-        let endY = Math.floor(random(1, height / 2)) * 2 + 1;
-        maze[endY][width - 1] = 0;
-
-        // Ensure path to exit by connecting the last passage cell to the exit
-        for (let x = width - 2; x >= 0; x--) {
-            if (maze[endY][x] === 0) {
-                maze[endY][x + 1] = 0;
-                break;
-            }
-        }
-
-        return { maze, start: [startY, 0], end: [endY, width - 1] };
-    }
-    */
     
     function generateMaze(width, height) {
         let maze = Array.from({ length: height }, () => Array(width).fill(1));
