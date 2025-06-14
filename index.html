@@ -128,6 +128,7 @@
 
     function selectCharacter(name) {
       Object.assign(player, CHARACTERS[name]);
+      player.characterName = name;
       player.x = hotTubArea.x;
       player.y = hotTubArea.y;
       gameState = "IN_GAME";
@@ -195,7 +196,12 @@
       });
       ee_song = loadSound("blunder.mp3", (s) => {
         s.disconnect();
-        s.connect(musicGain);
+
+        let eeBoost = getAudioContext().createGain();
+        eeBoost.gain.value = 2.0;
+
+        s.connect(eeBoost);
+        eeBoost.connect(musicGain);
       });
 
     }
@@ -302,9 +308,19 @@
         } else if(gameState === "PAUSED") {
           gameState = "IN_GAME";
         }
-      } else if (key.toLowerCase() === 'f' && inHouse && !eeTriggered) {
+      } else if (key.toLowerCase() === 'f' && inHouse && !eeTriggered && player.characterName === "DIESEL") {
+        if (musicTracks[currentTrackIndex]?.isPlaying()) {
+          musicTracks[currentTrackIndex].pause();
+        }
+
         eeTriggered = true;
         ee_song.play();
+
+        ee_song.onended(() => {
+          if (!musicTracks[currentTrackIndex].isPlaying()) {
+            musicTracks[currentTrackIndex].play();
+          }
+        });
       }
     }
 
@@ -980,6 +996,15 @@
       clockMinutes = 0;
       gameStartTime = millis();
       lastMazeAttempt = -Infinity;
+
+      if (ee_song && ee_song.isPlaying()) {
+        ee_song.stop();
+      }
+
+      if (!musicTracks[currentTrackIndex]?.isPlaying()) {
+        musicTracks[currentTrackIndex].play();
+      }
+
     }
 
     function isMoving() {
