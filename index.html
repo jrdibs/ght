@@ -918,9 +918,13 @@
 
     function resetGame() {
       // Reset everything that matters when starting over
+      inMaze = false;
+      hotTubTemp = 80;
       player = { x: 0, y: 0, speed: 2, smarts: 1, charisma: 1 };
       stamina = 100;
       maxStamina = 100;
+      icePopActive = false;
+      icePopEndMinute = null;
       suspicion = 0;
       heatOn = true;
       bodyTemp = 0;
@@ -928,13 +932,20 @@
       inventory = { water: 0, towel: 0, klondike: 0, ice_pop: 1 }; // change this when done testing
       grandmaTriangle = null;
       grandmaWatching = false;
+      grandmaWatchStart = 0;
+      grandmaWatchDuration = 0;
+      grandmaNextVisit = 30 + Math.floor(Math.random() * 61);
       inHotTub = true;
       inPool = false;
       inHouse = false;
       thermometerState = "Tub";
+      thermometerTemp = 80;
+      lastGrandmaAnswer = null;
+      lastAnswerTime = null;
       eeTriggered = false;
       clockMinutes = 0;
       gameStartTime = millis();
+      lastMazeAttempt = -Infinity;
     }
 
     function isMoving() {
