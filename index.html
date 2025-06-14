@@ -920,11 +920,12 @@
       // Reset everything that matters when starting over
       player = { x: 0, y: 0, speed: 2, smarts: 1, charisma: 1 };
       stamina = 100;
+      maxStamina = 100;
       suspicion = 0;
       heatOn = true;
       bodyTemp = 0;
       discomfort = 0;
-      inventory = { water: 0, towel: 0, klondike: 0, ice_pop: 0 };
+      inventory = { water: 0, towel: 0, klondike: 0, ice_pop: 1 }; // change this when done testing
       grandmaTriangle = null;
       grandmaWatching = false;
       inHotTub = true;
