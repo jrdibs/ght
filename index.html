@@ -1079,6 +1079,15 @@
       });
     }
 
+    function mousePressed() {
+      let ctx = getAudioContext();
+      if (ctx.state !== 'running') {
+        ctx.resume().then(() => {
+          console.log("Audio context resumed");
+        });
+      }
+    }
+
 
   </script>
 </body>
