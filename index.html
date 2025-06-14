@@ -67,6 +67,7 @@
     let maxStamina = 100;
 
     let ee_song;
+    let eePlaying = false;
     let sound_water, sound_towel, sound_klondike, sound_ice_pop, sound_therm_drop, sound_therm_pickup;
 
 /*
@@ -198,7 +199,7 @@
         s.disconnect();
 
         let eeBoost = getAudioContext().createGain();
-        eeBoost.gain.value = 2.0;
+        eeBoost.gain.value = 4.0; // change
 
         s.connect(eeBoost);
         eeBoost.connect(musicGain);
@@ -314,10 +315,12 @@
         }
 
         eeTriggered = true;
+        eePlaying = true;
         ee_song.play();
 
         ee_song.onended(() => {
-          if (!musicTracks[currentTrackIndex].isPlaying()) {
+          eePlaying = false;
+          if (!musicTracks[currentTrackIndex]?.isPlaying()) {
             musicTracks[currentTrackIndex].play();
           }
         });
@@ -997,8 +1000,9 @@
       gameStartTime = millis();
       lastMazeAttempt = -Infinity;
 
-      if (ee_song && ee_song.isPlaying()) {
+      if (eePlaying) {
         ee_song.stop();
+        eePlaying = false;
       }
 
       if (!musicTracks[currentTrackIndex]?.isPlaying()) {
@@ -1021,7 +1025,8 @@
 
     function playNextTrack() {
       let track = musicTracks[currentTrackIndex];
-      if (!track) return;
+      
+      if (eePlaying || !track) return;
 
       track.play();
       track.onended(() => {
