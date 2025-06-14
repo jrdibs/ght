@@ -100,6 +100,7 @@
     let currentTrackIndex = 0;
     let masterGain, musicGain, sfxGain;
     let masterVolume = 1.0, musicVolume = 1.0, sfxVolume = 1.0;
+    let activeSlider = null;
 
 
     function startMaze() {
@@ -606,10 +607,23 @@
         textSize(18);
         textAlign(LEFT, CENTER);
         fill(255);
-        text("Master", width / 2 - 100, 180);
-        text("Music", width / 2 - 100, 230);
-        text("Sounds", width / 2 - 100, 280);
-        // We'll add actual sliders later
+        drawSlider("Master Volume", width / 2 - 100, 180, masterVolume, (v) => {
+          masterVolume = v;
+          masterGain.gain.value = v;
+          localStorage.setItem("vol_master", v.toFixed(2));
+        });
+
+        drawSlider("Music Volume", width / 2 - 100, 230, musicVolume, (v) => {
+          musicVolume = v;
+          musicGain.gain.value = v;
+          localStorage.setItem("vol_music", v.toFixed(2));
+        });
+
+        drawSlider("Sound Volume", width / 2 - 100, 280, sfxVolume, (v) => {
+          sfxVolume = v;
+          sfxGain.gain.value = v;
+          localStorage.setItem("vol_sfx", v.toFixed(2));
+        });
       }
 
       // --- CONTROLS TAB CONTENT (empty for now) ---
@@ -952,6 +966,33 @@
           console.log("Audio context resumed");
         });
       }
+    }
+
+    function drawSlider(label, x, y, value, onChange) {
+      const w = 200;
+      const h = 20;
+
+      // Track hover/click
+      const hovering = mouseX > x && mouseX < x + w && mouseY > y && mouseY < y + h;
+      if (mouseIsPressed && hovering) {
+        let newValue = (mouseX - x) / w;
+        newValue = constrain(newValue, 0, 1);
+        onChange(newValue);
+      }
+
+      // Background bar
+      fill(80);
+      rect(x, y, w, h, 5);
+
+      // Fill bar
+      fill(200);
+      rect(x, y, value * w, h, 5);
+
+      // Label
+      fill(255);
+      textAlign(LEFT, CENTER);
+      textSize(16);
+      text(label, x, y - 10);
     }
 
 
