@@ -66,6 +66,10 @@
     let icePopEndMinute = null;
     let maxStamina = 100;
 
+    let ee_song;
+    let sound_water, sound_towel, sound_klondike, sound_ice_pop, sound_therm_drop, sound_therm_pickup;
+
+/*
     let ee_song = new Audio("blunder.mp3");
     let sound_water = new Audio("Sounds/water.mp3")
     let sound_towel = new Audio("Sounds/towel.mp3")
@@ -73,7 +77,7 @@
     let sound_ice_pop = new Audio("Sounds/ice_pop.mp3")
     let sound_therm_drop = new Audio("Sounds/therm_drop.mp3")
     let sound_therm_pickup = new Audio("Sounds/therm_pickup.mp3")
-
+*/
 
     let grandmaWatching = false;
     let grandmaWatchStart = 0;
@@ -164,6 +168,36 @@
 
       // === Start loop once loaded ===
       setTimeout(startMusicLoop, 1000); // slight delay to ensure loading
+
+      sound_water = loadSound("Sounds/water.mp3", (s) => {
+        s.disconnect();
+        s.connect(sfxGain);
+      });
+      sound_towel = loadSound("Sounds/towel.mp3", (s) => {
+        s.disconnect();
+        s.connect(sfxGain);
+      });
+      sound_klondike = loadSound("Sounds/klondike.mp3", (s) => {
+        s.disconnect();
+        s.connect(sfxGain);
+      });
+      sound_ice_pop = loadSound("Sounds/ice_pop.mp3", (s) => {
+        s.disconnect();
+        s.connect(sfxGain);
+      });
+      sound_therm_drop = loadSound("Sounds/therm_drop.mp3", (s) => {
+        s.disconnect();
+        s.connect(sfxGain);
+      });
+      sound_therm_pickup = loadSound("Sounds/therm_pickup.mp3", (s) => {
+        s.disconnect();
+        s.connect(sfxGain);
+      });
+      ee_song = loadSound("blunder.mp3", (s) => {
+        s.disconnect();
+        s.connect(musicGain);
+      });
+
     }
 
     function drawClock() {
