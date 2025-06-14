@@ -241,7 +241,7 @@
     }
 
     function keyPressed() {
-      console.log("Key pressed:", key, keyCode, "Game state:", gameState); // for debugging
+      //console.log("Key pressed:", key, keyCode, "Game state:", gameState); // for debugging
       if (key === '1' && inventory.water > 0) {
         bodyTemp = 0;
         inventory.water--;
@@ -685,10 +685,10 @@
 
       const hovering = mouseX > x && mouseX < x + w && mouseY > y && mouseY < y + h;
 
-      console.log(hovering, mouseIsPressed, mouseWasPressedLastFrame);
+      //console.log(hovering, mouseIsPressed, mouseWasPressedLastFrame);
 
       if (hovering && mouseIsPressed && !mouseWasPressedLastFrame) {
-        console.log('click');
+        //console.log('click');
         onClick();
       }
     }
