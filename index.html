@@ -486,8 +486,7 @@
         if (keyIsDown(83)) player.y += moveSpeed;
 
         let now = millis();
-        footstepInterval = isSprinting ? 180 : 300;
-        footstepInterval -= 50 * (player.speed - 2);
+        footstepInterval = isSprinting ? (180 - 50 * (player.speed - 2)) : (300 - 50 * (player.speed - 2));
 
         if (isMoving && now - lastFootstepTime > footstepInterval) {
           let surface = inHotTub || inPool ? "water" : "land";
