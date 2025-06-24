@@ -70,6 +70,14 @@
     let eePlaying = false;
     let sound_water, sound_towel, sound_klondike, sound_ice_pop, sound_therm_drop, sound_therm_pickup;
 
+    let footstepSounds = {
+      land: [],
+      water: []
+    };
+
+    let lastFootstepTime = 0;
+    let footstepInterval = 300;
+
 /*
     let ee_song = new Audio("blunder.mp3");
     let sound_water = new Audio("Sounds/water.mp3")
@@ -205,6 +213,25 @@
         eeBoost.connect(musicGain);
       });
 
+      loadFootstepSounds();
+
+    }
+
+    function loadFootstepSounds() {
+      const footstepMap = {
+        land: ["foostep_land_1.mp3", "footstep_land_2.mp3"],
+        water: ["footstep_water_1.mp3", "footstep_water_2.mp3"],
+      };
+
+      for (let type in footstepMap) {
+        for (let file of footstepMap[type]) {
+          let s = loadSound("Sounds/Footsteps/" + file, (sound) => {
+            sound.disconnect();
+            sound.connect(sfxGain);
+          });
+          footstepSounds[type].push(s);
+        }
+      }
     }
 
     function drawClock() {
@@ -457,6 +484,26 @@
         if (keyIsDown(68)) player.x += moveSpeed;
         if (keyIsDown(87)) player.y -= moveSpeed;
         if (keyIsDown(83)) player.y += moveSpeed;
+
+        let now = millis();
+        footstepInterval = isSprinting ? 180 : 300;
+        footstepInterval -= 50 * (player.speed - 2);
+
+        if (isMoving && now - lastFootstepTime > footstepInterval) {
+          let surface = inHotTub || inPool ? "water" : "land";
+          let key = `${surface}`;
+          let sounds = footstepSounds[key];
+          if (sounds && sounds.length > 0) {
+            let sfx = random(sounds);
+            if (!sfx.isPlaying()) {
+              sfx.rate(random(0.95, 1.05)); // Slight pitch variation
+              sfx.setVolume(random(0.9, 1.1)); // Slight volume shift
+              sfx.play();
+            }
+          }
+          lastFootstepTime = now;
+        }
+
 
         if (keyIsDown(84)) {
           if(inHotTub) {
@@ -1013,6 +1060,10 @@
 
     function isMoving() {
       return keyIsDown(65) || keyIsDown(68) || keyIsDown(87) || keyIsDown(83);
+    }
+
+    function isSprinting() {
+      return isMoving() && keyIsDown(SHIFT) && stamina > 0;
     }
 
     function startMusicLoop() {
