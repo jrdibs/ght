@@ -219,7 +219,7 @@
 
     function loadFootstepSounds() {
       const footstepMap = {
-        land: ["foostep_land_1.mp3", "footstep_land_2.mp3"],
+        land: ["footstep_land_1.mp3", "footstep_land_2.mp3"],
         water: ["footstep_water_1.mp3", "footstep_water_2.mp3"],
       };
 
@@ -486,9 +486,9 @@
         if (keyIsDown(83)) player.y += moveSpeed;
 
         let now = millis();
-        footstepInterval = isSprinting ? (180 - 50 * (player.speed - 2)) : (300 - 50 * (player.speed - 2));
+        footstepInterval = isSprinting() ? (180 - 50 * (player.speed - 2)) : (300 - 50 * (player.speed - 2));
 
-        if (isMoving && now - lastFootstepTime > footstepInterval) {
+        if (isMoving() && now - lastFootstepTime > footstepInterval) {
           let surface = inHotTub || inPool ? "water" : "land";
           let key = `${surface}`;
           let sounds = footstepSounds[key];
